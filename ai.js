@@ -306,7 +306,19 @@
   function hideHighlightPalette() { var p = $("aiHighlightPalette"); if (p) p.classList.add("hidden"); }
 
   // ---------- 划词浮动工具条（文石 BOOX 式：AI解读 / 翻译 / 划线 / 复制） ----------
+  // 选区新鲜度：只有最近 2 秒内刚选出来的文字才出工具条。
+  // 以前的问题：点「划线」按钮时系统会先把选区收掉，选区清空的监听
+  // 把工具条藏了，但随后弹出的划线小面板却单独留在了屏幕上（就是
+  // 你截图里那种只有高亮/下划线/波浪线/灰底/清除、没有选文字的样子）；
+  // 而滚动藏工具条时选区没清掉，旧选区之后又会把工具条招回来。
+  var lastSelChangeAt = 0;
   function hideToolbar() { var t = $("aiSelectToolbar"); if (t) t.classList.add("hidden"); hideHighlightPalette(); }
+  function dismissToolbar() {
+    var t = $("aiSelectToolbar"), p = $("aiHighlightPalette");
+    var visible = (t && !t.classList.contains("hidden")) || (p && !p.classList.contains("hidden"));
+    hideToolbar();
+    if (visible) { try { window.getSelection().removeAllRanges(); } catch (e) {} }
+  }
   function showToolbarAt(rect) {
     var t = $("aiSelectToolbar");
     if (!t) return;
@@ -321,8 +333,10 @@
   function onSelectionEnd() {
     setTimeout(function () {
       var sel = window.getSelection();
-      // 只有真的框选了文字才出工具条：没选、只点了光标、选了不到 2 个字，都不出现。
+      // 只有真的框选了文字才出工具条：没选、只点了光标、选了不到 2 个字、
+      // 或者选区是很久以前留下来的旧选区，都不出现。
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) { hideToolbar(); return; }
+      if (Date.now() - lastSelChangeAt > 2000) { hideToolbar(); return; }
       var text = sel.toString().trim();
       var container = $("chapterContent");
       if (!text || text.length < 2 || text.length > 2000 || !container || !container.contains(sel.anchorNode)) { hideToolbar(); return; }
@@ -343,6 +357,7 @@
       timer = setTimeout(function () {
         var sel = window.getSelection();
         if (!sel || sel.isCollapsed || sel.toString().trim().length < 2) return;
+        if (Date.now() - lastSelChangeAt > 2000) return; // 旧选区不招回工具条
         lastSelection = sel.toString().trim();
         lastSelectionPara = selectionParaIndex();
         showToolbarAt(sel.getRangeAt(0).getBoundingClientRect());
@@ -355,20 +370,22 @@
     }, { passive: true });
     content.addEventListener("touchend", function () { if (timer) { clearTimeout(timer); timer = null; } }, { passive: true });
   }
-  // 工具条出现后，点别处 / 滚动 / 选区清空就收起来，别一直赖在屏幕上。
+  // 工具条出现后，点别处 / 滚动就收起来，同时把选区也清掉，
+  // 这样旧选区之后就不会再把工具条招回来。注意：不再用选区清空来
+  // 自动藏工具条——点工具条上的按钮时系统会先收掉选区，那样会把
+  // 工具条藏了、却把刚弹出的划线小面板单独留在屏幕上。
   function bindHideToolbar() {
     function outside(e) {
       var t = $("aiSelectToolbar"), p = $("aiHighlightPalette");
-      if (t && !t.classList.contains("hidden") && !t.contains(e.target) && !(p && p.contains(e.target))) hideToolbar();
-      else if (p && !p.classList.contains("hidden") && !p.contains(e.target) && !(t && t.contains(e.target))) hideHighlightPalette();
+      if (t && !t.classList.contains("hidden") && !t.contains(e.target) && !(p && p.contains(e.target))) dismissToolbar();
+      else if (p && !p.classList.contains("hidden") && !p.contains(e.target) && !(t && t.contains(e.target))) dismissToolbar();
     }
     document.addEventListener("mousedown", outside);
     document.addEventListener("touchstart", outside, { passive: true });
-    window.addEventListener("scroll", function () { hideToolbar(); }, { passive: true });
+    window.addEventListener("scroll", function () { dismissToolbar(); }, { passive: true });
     document.addEventListener("selectionchange", function () {
       var sel = window.getSelection();
-      var t = $("aiSelectToolbar");
-      if (t && !t.classList.contains("hidden") && (!sel || sel.isCollapsed || !sel.toString().trim())) hideToolbar();
+      if (sel && !sel.isCollapsed && sel.toString().trim()) lastSelChangeAt = Date.now();
     });
   }
 
@@ -429,6 +446,7 @@
     if (hlBtn) hlBtn.onclick = function () {
       var p = $("aiHighlightPalette");
       if (!p) return;
+      if (!p.classList.contains("hidden")) { hideHighlightPalette(); return; } // 再点一次就收起来
       var t = $("aiSelectToolbar");
       var r = t ? t.getBoundingClientRect() : { left: 8, bottom: 100 };
       p.classList.remove("hidden");
