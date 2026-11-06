@@ -87,6 +87,7 @@
       books.unshift(b); lsSet("ebook_local_books", books); return b;
     },
     deleteBook: function (bookId) {
+      if (window.EbookImages) { try { window.EbookImages.deleteForBook(bookId); } catch (e) {} }
       var book = ls("ebook_local_books", []).find(function (b) { return b._id === bookId; });
       lsSet("ebook_local_books", ls("ebook_local_books", []).filter(function (b) { return b._id !== bookId; }));
       var comments = ls("ebook_local_comments", []);

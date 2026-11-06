@@ -481,5 +481,5 @@
     makeDraggable($("aiInterpretFloat"), $("aiInterpretHeader"));
   });
 
-  window.EbookAI = { getSettings: getSettings, saveSettings: saveSettings, chat: chat, summarizeChapter: summarizeChapter, openInterpret: openInterpret };
+  window.EbookAI = { getSettings: getSettings, saveSettings: saveSettings, chat: chat, summarizeChapter: summarizeChapter, openInterpret: openInterpret, hideToolbar: hideToolbar };
 })();

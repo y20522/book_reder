@@ -77,6 +77,16 @@
         await loadShelf();
       };
       card.appendChild(del);
+      // 封面：旧书的 coverUrl 在书里直接拿；新书的封面在 IndexedDB 里，异步取回来再补上。
+      if (!b.coverUrl && window.EbookImages) {
+        (function (c, bookId) {
+          window.EbookImages.get(bookId + "|cover").then(function (url) {
+            if (!url || !c.isConnected) return;
+            var img = document.createElement("img"); img.src = url; img.alt = "";
+            c.insertBefore(img, c.firstChild);
+          });
+        })(card, b._id);
+      }
       card.onclick = function () { openBook(b._id); };
       shelf.appendChild(card);
     });
@@ -88,15 +98,25 @@
   // 导出成一个 JSON 文件，自己发到手机上再导入就行。云端模式请走云端同步。
   function lsRead(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || "null") || fallback; } catch (e) { return fallback; } }
   function lsWrite(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
-  function exportShelf() {
+  async function exportShelf() {
     if (api.mode !== "local") { alert("云端模式下请用云端同步，导出导入只支持本地模式"); return; }
+    var books = lsRead("ebook_local_books", []);
+    // 图片在 IndexedDB 里，导出时一起带上，不然换设备导入后图片还是占位。
+    var images = {};
+    if (window.EbookImages) {
+      for (var ei = 0; ei < books.length; ei++) {
+        var m = await window.EbookImages.getAllForBook(books[ei]._id);
+        if (m && Object.keys(m).length) images[books[ei]._id] = m;
+      }
+    }
     var data = {
       version: 1, exportedAt: Date.now(),
-      books: lsRead("ebook_local_books", []),
+      books: books,
       comments: lsRead("ebook_local_comments", []),
       bookmarks: lsRead("ebook_local_bookmarks", []),
       progress: lsRead("ebook_local_progress", []),
-      likes: lsRead("ebook_local_likes", [])
+      likes: lsRead("ebook_local_likes", []),
+      images: images
     };
     if (!data.books.length) { alert("书架还是空的，先上传一本书再导出"); return; }
     var blob = new Blob([JSON.stringify(data)], { type: "application/json" });
@@ -140,6 +160,17 @@
         else prog.push(p);
       });
       lsWrite("ebook_local_progress", prog);
+      // 导出文件里带的图片写回 IndexedDB。
+      if (data.images && window.EbookImages) {
+        var bids = Object.keys(data.images);
+        for (var ii2 = 0; ii2 < bids.length; ii2++) {
+          var bid = bids[ii2], map = data.images[bid] || {};
+          var paths2 = Object.keys(map);
+          for (var jj = 0; jj < paths2.length; jj++) {
+            try { await window.EbookImages.put(bid + "|" + paths2[jj], map[paths2[jj]]); } catch (e) {}
+          }
+        }
+      }
       await loadShelf();
       alert("导入完成：新增 " + added + " 本，更新 " + updated + " 本。现在书架上有 " + books.length + " 本书。");
     } catch (err) {
@@ -175,7 +206,10 @@
     }
     refreshBookmarks();
   }
-  $("backBtn").onclick = function () { $("readerView").classList.add("hidden"); $("shelfView").classList.remove("hidden"); loadShelf(); };
+  $("backBtn").onclick = function () {
+    if (window.EbookAI && window.EbookAI.hideToolbar) window.EbookAI.hideToolbar();
+    $("readerView").classList.add("hidden"); $("shelfView").classList.remove("hidden"); loadShelf();
+  };
 
   // 手机沉浸阅读（番茄式）：点章节标题、或向下滚时收起上下栏，向上滚 / 点右下角 ☰ 再显示。
   // 段落点开段评的逻辑不变，标题点按只负责显隐菜单。
@@ -221,10 +255,21 @@
     (state.chapter.blocks || []).forEach(function (block, idx) {
       if (block.kind === "image") {
         var div = document.createElement("div"); div.className = "imgblock"; div.setAttribute("data-para", idx);
-        // imageUrl 有值就显示真图（云端是存储地址，本地是上传时嵌进去的 data URL）；
-        // 没有才显示占位（比如旧版本传的书、或存储满了被去掉图片的书）。
+        // imageUrl 有值就显示真图（云端是存储地址，旧版本本地书是嵌进去的 data URL）；
+        // 没有就去 IndexedDB 里取（新版本本地书的图片存在那里，见 imgstore.js）；
+        // 取不到才显示占位。
         if (block.imageUrl) { var im = document.createElement("img"); im.src = block.imageUrl; im.loading = "lazy"; div.appendChild(im); }
-        else { var note = document.createElement("p"); note.style.color = "var(--dim)"; note.textContent = "［插图：" + (block.imagePath || "图片") + "］"; div.appendChild(note); }
+        else if (window.EbookImages && block.imagePath) {
+          var note = document.createElement("p"); note.style.color = "var(--dim)"; note.textContent = "［插图：" + (block.imagePath || "图片") + "］"; div.appendChild(note);
+          (function (d, n, path) {
+            window.EbookImages.get(state.book._id + "|" + path).then(function (url) {
+              if (!url || !d.isConnected) return;
+              var img2 = document.createElement("img"); img2.src = url; img2.loading = "lazy";
+              d.replaceChild(img2, n);
+            });
+          })(div, note, block.imagePath);
+        }
+        else { var note2 = document.createElement("p"); note2.style.color = "var(--dim)"; note2.textContent = "［插图：" + (block.imagePath || "图片") + "］"; div.appendChild(note2); }
         var cnt = state.commentCounts[idx] || 0;
         if (cnt) { var b = document.createElement("span"); b.className = "bubble"; b.textContent = cnt; div.appendChild(b); }
         div.onclick = function () { if (window.getSelection && window.getSelection().toString().trim().length > 1) return; openComments(idx); };
@@ -434,24 +479,45 @@
           if (uploaded[parsed.coverPath].tempFileURL) book.coverUrl = uploaded[parsed.coverPath].tempFileURL;
         }
       }
-      // Local mode: no object storage, so embed the images as downscaled
-      // data URLs (see imageBytesToDataUrl). One failed image never fails
-      // the whole upload — that block keeps its placeholder.
+      // Local mode: images go to IndexedDB (see imgstore.js), NOT into the
+      // book JSON in localStorage — iPhone Safari only gives localStorage
+      // ~5MB, and 34 卷的 18 张插图转成 base64 要几 MB，存书时会报
+      // "The quota has been exceeded"，整本都传不上去。书的文字只占
+      // 几百 KB，放 localStorage 没问题；图片按 bookId|路径存在
+      // IndexedDB 里，阅读器和书架封面打开时再去取。
+      // 旧书（v20261106-4 之前传的）是把图片嵌在书里的，照样能显示，
+      // 不用重新传。
       if (api.mode !== "cloud" && parsed.files) {
         var localPaths = (parsed.imagePaths || []).slice();
         if (parsed.coverPath && localPaths.indexOf(parsed.coverPath) < 0) localPaths.push(parsed.coverPath);
-        var localImgs = {};
-        for (var li = 0; li < localPaths.length; li++) {
-          var lp = localPaths[li]; var lb = parsed.files[lp];
-          if (!lb) continue;
-          try { localImgs[lp] = await imageBytesToDataUrl(lb, lp); } catch (e) { /* keep placeholder */ }
-        }
-        book.chapters.forEach(function (ch) {
-          ch.blocks.forEach(function (b) {
-            if (b.kind === "image" && localImgs[b.imagePath]) b.imageUrl = localImgs[b.imagePath];
+        var imgs = window.EbookImages;
+        if (imgs && imgs.available()) {
+          if (!book._id) book._id = "book-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+          for (var li = 0; li < localPaths.length; li++) {
+            var lp = localPaths[li]; var lb = parsed.files[lp];
+            if (!lb) continue;
+            try {
+              var du = await imageBytesToDataUrl(lb, lp);
+              await imgs.put(book._id + "|" + lp, du);
+              if (lp === parsed.coverPath) await imgs.put(book._id + "|cover", du);
+            } catch (e) { /* 这张图存不进，就留占位，不拖垮整本 */ }
+          }
+        } else {
+          // 浏览器没有 IndexedDB：退回老办法，把图片嵌进书里。
+          // 书小的时候能用，书大（比如 34 卷）还是可能报额度不足。
+          var localImgs = {};
+          for (var lj = 0; lj < localPaths.length; lj++) {
+            var lp2 = localPaths[lj]; var lb2 = parsed.files[lp2];
+            if (!lb2) continue;
+            try { localImgs[lp2] = await imageBytesToDataUrl(lb2, lp2); } catch (e) { /* keep placeholder */ }
+          }
+          book.chapters.forEach(function (ch) {
+            ch.blocks.forEach(function (b) {
+              if (b.kind === "image" && localImgs[b.imagePath]) b.imageUrl = localImgs[b.imagePath];
+            });
           });
-        });
-        if (parsed.coverPath && localImgs[parsed.coverPath]) book.coverUrl = localImgs[parsed.coverPath];
+          if (parsed.coverPath && localImgs[parsed.coverPath]) book.coverUrl = localImgs[parsed.coverPath];
+        }
       }
       var created;
       try {
