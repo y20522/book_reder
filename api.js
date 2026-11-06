@@ -103,8 +103,8 @@
     saveProgress: function (d) { return API ? cloud("saveProgress", d) : Promise.resolve(local.saveProgress(d)); },
     createBook: function (b) { return API ? cloud("createBook", { book: b }) : Promise.resolve(local.createBook(b)); },
     // Upload one EPUB image to object storage; returns { fileID, tempFileURL }.
-    // Local mode has no storage, so this is a no-op there and the reader
-    // keeps showing the image placeholder note (see app.js renderChapter).
+    // Local mode has no storage, so this is a no-op there — instead app.js
+    // embeds downscaled images as data URLs on upload (see imageBytesToDataUrl).
     putBookImage: function (d) { return API ? cloud("putBookImage", d) : Promise.resolve({ fileID: d.imageKey || "", tempFileURL: "" }); }
   };
 })();

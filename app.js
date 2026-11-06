@@ -21,6 +21,34 @@
     return btoa(s);
   }
   function extOf(path) { var m = /(\.[A-Za-z0-9]+)$/.exec(path || ""); return m ? m[1].toLowerCase() : ""; }
+  // 把 EPUB 里的图片转成 data URL，嵌进书里存到本机。
+  // 原因：本地模式没有对象存储，imagePath 只是 zip 里的内部路径
+  // （如 OEBPS/Images/xxx.jpg），浏览器拿它当网址是打不开的，
+  // 所以以前只能显示「［插图：…］」占位。转成 data URL 后就能真显示。
+  // 图片先缩到最长边 800px、JPEG 0.78 质量再存：34 卷 18 张原图共 3.7MB，
+  // 直接存 base64 会把 localStorage（约 5MB）撑爆，缩完约 1MB 左右才放得下。
+  function blobToDataUrl(blob) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader(); r.onload = function () { resolve(r.result); }; r.onerror = reject; r.readAsDataURL(blob);
+    });
+  }
+  async function imageBytesToDataUrl(bytes, path) {
+    var ext = extOf(path);
+    var mime = ext === ".png" ? "image/png" : ext === ".gif" ? "image/gif" : ext === ".webp" ? "image/webp" : "image/jpeg";
+    try {
+      var blob = new Blob([bytes], { type: mime });
+      var bmp = await createImageBitmap(blob);
+      var scale = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+      var w = Math.max(1, Math.round(bmp.width * scale)), h = Math.max(1, Math.round(bmp.height * scale));
+      var canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(bmp, 0, 0, w, h);
+      if (typeof bmp.close === "function") bmp.close();
+      var outType = mime === "image/png" ? "image/png" : "image/jpeg";
+      var out = await new Promise(function (resolve) { canvas.toBlob(resolve, outType, 0.78); });
+      if (out) return await blobToDataUrl(out);
+    } catch (e) { /* 缩图失败就原样存 */ }
+    return "data:" + mime + ";base64," + bytesToBase64(bytes);
+  }
   function openModal(id) { $(id).classList.add("open"); }
   function closeModal(id) { $(id).classList.remove("open"); }
   document.querySelectorAll(".modal").forEach(function (m) { m.addEventListener("click", function (e) { if (e.target === m) m.classList.remove("open"); }); });
@@ -67,7 +95,7 @@
     a.href = URL.createObjectURL(blob); a.download = "ebook-shelf-export.json";
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-    alert("已导出 " + data.books.length + " 本书，文件里有书、段评、书签和进度；发到手机上再点「导入书架」就行。插图在本地模式下本来就是占位，导入后还是占位。");
+    alert("已导出 " + data.books.length + " 本书，文件里有书、段评、书签和进度，插图也一起在里面（所以文件会比较大）；发到手机上再点「导入书架」就行。");
   }
   async function importShelfFile(file) {
     if (!file) return;
@@ -184,9 +212,9 @@
     (state.chapter.blocks || []).forEach(function (block, idx) {
       if (block.kind === "image") {
         var div = document.createElement("div"); div.className = "imgblock"; div.setAttribute("data-para", idx);
-        // Local mode: imagePath is a zip path, not a URL, so show a placeholder note.
-        // Cloud mode: the server returns imageUrl for stored images.
-        if (block.imageUrl) { var im = document.createElement("img"); im.src = block.imageUrl; div.appendChild(im); }
+        // imageUrl 有值就显示真图（云端是存储地址，本地是上传时嵌进去的 data URL）；
+        // 没有才显示占位（比如旧版本传的书、或存储满了被去掉图片的书）。
+        if (block.imageUrl) { var im = document.createElement("img"); im.src = block.imageUrl; im.loading = "lazy"; div.appendChild(im); }
         else { var note = document.createElement("p"); note.style.color = "var(--dim)"; note.textContent = "［插图：" + (block.imagePath || "图片") + "］"; div.appendChild(note); }
         var cnt = state.commentCounts[idx] || 0;
         if (cnt) { var b = document.createElement("span"); b.className = "bubble"; b.textContent = cnt; div.appendChild(b); }
@@ -348,7 +376,6 @@
       // placeholder note. The book id is generated here so images can be
       // stored under books/<bookId>/images/. One failed image never fails
       // the whole book upload — that block keeps its placeholder.
-      // Local mode: no storage, so imagePath is kept for reference only.
       if (api.mode === "cloud" && parsed.files) {
         var bookId = "book-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
         book._id = bookId;
@@ -377,7 +404,43 @@
           if (uploaded[parsed.coverPath].tempFileURL) book.coverUrl = uploaded[parsed.coverPath].tempFileURL;
         }
       }
-      var created = await api.createBook(book);
+      // Local mode: no object storage, so embed the images as downscaled
+      // data URLs (see imageBytesToDataUrl). One failed image never fails
+      // the whole upload — that block keeps its placeholder.
+      if (api.mode !== "cloud" && parsed.files) {
+        var localPaths = (parsed.imagePaths || []).slice();
+        if (parsed.coverPath && localPaths.indexOf(parsed.coverPath) < 0) localPaths.push(parsed.coverPath);
+        var localImgs = {};
+        for (var li = 0; li < localPaths.length; li++) {
+          var lp = localPaths[li]; var lb = parsed.files[lp];
+          if (!lb) continue;
+          try { localImgs[lp] = await imageBytesToDataUrl(lb, lp); } catch (e) { /* keep placeholder */ }
+        }
+        book.chapters.forEach(function (ch) {
+          ch.blocks.forEach(function (b) {
+            if (b.kind === "image" && localImgs[b.imagePath]) b.imageUrl = localImgs[b.imagePath];
+          });
+        });
+        if (parsed.coverPath && localImgs[parsed.coverPath]) book.coverUrl = localImgs[parsed.coverPath];
+      }
+      var created;
+      try {
+        created = await api.createBook(book);
+      } catch (err2) {
+        // 本机存储满了（localStorage 约 5MB）：去掉图片再存一次，
+        // 至少文字和章节能留下来，图片恢复成占位。
+        if (err2 && (err2.name === "QuotaExceededError" || err2.code === 22)) {
+          book.chapters.forEach(function (ch) { ch.blocks.forEach(function (b) { if (b.kind === "image") delete b.imageUrl; }); });
+          delete book.coverUrl;
+          created = await api.createBook(book);
+          alert("书已上传，但本机存储不够，图片没能存下来，只显示占位。可以先删一本旧书再重新上传。");
+          await loadShelf();
+          if (created && created._id) openBook(created._id);
+          e.target.value = "";
+          return;
+        }
+        throw err2;
+      }
       alert("上传成功：《" + book.title + "》共 " + book.chapters.length + " 章");
       await loadShelf();
       if (created && created._id) openBook(created._id);
