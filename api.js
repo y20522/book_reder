@@ -85,6 +85,29 @@
       var books = ls("ebook_local_books", []);
       var b = Object.assign({ _id: uid(), createdAt: Date.now() }, book);
       books.unshift(b); lsSet("ebook_local_books", books); return b;
+    },
+    deleteBook: function (bookId) {
+      var book = ls("ebook_local_books", []).find(function (b) { return b._id === bookId; });
+      lsSet("ebook_local_books", ls("ebook_local_books", []).filter(function (b) { return b._id !== bookId; }));
+      var comments = ls("ebook_local_comments", []);
+      var kept = comments.filter(function (c) { return c.bookId !== bookId; });
+      var removedIds = {};
+      comments.forEach(function (c) { if (c.bookId === bookId) removedIds[c._id] = true; });
+      lsSet("ebook_local_comments", kept);
+      lsSet("ebook_local_likes", ls("ebook_local_likes", []).filter(function (id) { return !removedIds[id]; }));
+      lsSet("ebook_local_bookmarks", ls("ebook_local_bookmarks", []).filter(function (b) { return b.bookId !== bookId; }));
+      lsSet("ebook_local_progress", ls("ebook_local_progress", []).filter(function (p) { return p.bookId !== bookId; }));
+      // 划线和 AI总结是按书名存的，一起清掉，免得删了书还留着旧记录。
+      if (book && book.title) {
+        try {
+          var hls = JSON.parse(localStorage.getItem("ebook_highlights_v1") || "[]");
+          localStorage.setItem("ebook_highlights_v1", JSON.stringify(hls.filter(function (h) { return h.book !== book.title; })));
+          var sums = JSON.parse(localStorage.getItem("ebook_ai_summaries_v1") || "{}");
+          Object.keys(sums).forEach(function (k) { if (k.indexOf(book.title + " | ") === 0) delete sums[k]; });
+          localStorage.setItem("ebook_ai_summaries_v1", JSON.stringify(sums));
+        } catch (e) {}
+      }
+      return true;
     }
   };
 
@@ -102,6 +125,7 @@
     deleteBookmark: function (id) { return API ? cloud("deleteBookmark", { bookmarkId: id }) : Promise.resolve(local.deleteBookmark(id)); },
     saveProgress: function (d) { return API ? cloud("saveProgress", d) : Promise.resolve(local.saveProgress(d)); },
     createBook: function (b) { return API ? cloud("createBook", { book: b }) : Promise.resolve(local.createBook(b)); },
+    deleteBook: function (id) { return API ? cloud("deleteBook", { bookId: id }) : Promise.resolve(local.deleteBook(id)); },
     // Upload one EPUB image to object storage; returns { fileID, tempFileURL }.
     // Local mode has no storage, so this is a no-op there — instead app.js
     // embeds downscaled images as data URLs on upload (see imageBytesToDataUrl).

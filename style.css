@@ -14,7 +14,8 @@ img{max-width:100%;height:auto}
 .btn{border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px 12px;border-radius:8px}
 .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .shelf{max-width:900px;margin:0 auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-.bookcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer}
+.bookcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;position:relative}
+.book-del{position:absolute;top:6px;right:6px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--dim);font-size:14px;z-index:2;line-height:1}
 .bookcard img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;background:#eee}
 .bookcard h3{margin:10px 0 4px;font-size:16px}
 .bookcard p{margin:2px 0;color:var(--dim);font-size:13px}

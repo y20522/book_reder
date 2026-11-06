@@ -321,7 +321,8 @@
   function onSelectionEnd() {
     setTimeout(function () {
       var sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) { hideToolbar(); return; }
+      // 只有真的框选了文字才出工具条：没选、只点了光标、选了不到 2 个字，都不出现。
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) { hideToolbar(); return; }
       var text = sel.toString().trim();
       var container = $("chapterContent");
       if (!text || text.length < 2 || text.length > 2000 || !container || !container.contains(sel.anchorNode)) { hideToolbar(); return; }
@@ -330,26 +331,21 @@
       showToolbarAt(sel.getRangeAt(0).getBoundingClientRect());
     }, 30);
   }
-  // 长按（手机 / 墨水屏）：按住一个段落 600ms 不动，就选中整段并弹出工具条，
-  // 和 BOOX 长按选词后出工具条一样。滑动会取消，不影响正常翻页。
+  // 长按（手机 / 墨水屏）：只在系统已经选出词的情况下才出工具条，
+  // 绝不自己替用户选中整段——以前长按 600ms 会自动选中整段，
+  // 就是没框选也弹出工具条的原因。滑动会取消，不影响正常翻页。
   function bindLongPress(content) {
     if (!content) return;
     var timer = null, sx = 0, sy = 0;
     content.addEventListener("touchstart", function (e) {
       if (e.touches.length !== 1) return;
       sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-      var target = e.target;
-      var para = target && target.closest ? target.closest(".para") : null;
-      if (!para) return;
       timer = setTimeout(function () {
         var sel = window.getSelection();
-        if (sel && sel.toString().trim().length > 1) return; // 已经选了词，等 touchend 出工具条
-        var range = document.createRange();
-        range.selectNodeContents(para);
-        sel.removeAllRanges(); sel.addRange(range);
-        lastSelection = para.textContent.replace(/\s*\d+\s*$/, "").trim();
-        lastSelectionPara = parseInt(para.getAttribute("data-para"), 10) || -1;
-        showToolbarAt(para.getBoundingClientRect());
+        if (!sel || sel.isCollapsed || sel.toString().trim().length < 2) return;
+        lastSelection = sel.toString().trim();
+        lastSelectionPara = selectionParaIndex();
+        showToolbarAt(sel.getRangeAt(0).getBoundingClientRect());
       }, 600);
     }, { passive: true });
     content.addEventListener("touchmove", function (e) {
@@ -358,6 +354,22 @@
       if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) { clearTimeout(timer); timer = null; }
     }, { passive: true });
     content.addEventListener("touchend", function () { if (timer) { clearTimeout(timer); timer = null; } }, { passive: true });
+  }
+  // 工具条出现后，点别处 / 滚动 / 选区清空就收起来，别一直赖在屏幕上。
+  function bindHideToolbar() {
+    function outside(e) {
+      var t = $("aiSelectToolbar"), p = $("aiHighlightPalette");
+      if (t && !t.classList.contains("hidden") && !t.contains(e.target) && !(p && p.contains(e.target))) hideToolbar();
+      else if (p && !p.classList.contains("hidden") && !p.contains(e.target) && !(t && t.contains(e.target))) hideHighlightPalette();
+    }
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("touchstart", outside, { passive: true });
+    window.addEventListener("scroll", function () { hideToolbar(); }, { passive: true });
+    document.addEventListener("selectionchange", function () {
+      var sel = window.getSelection();
+      var t = $("aiSelectToolbar");
+      if (t && !t.classList.contains("hidden") && (!sel || sel.isCollapsed || !sel.toString().trim())) hideToolbar();
+    });
   }
 
   // ---------- 悬浮窗拖动 ----------
@@ -447,10 +459,7 @@
       content.addEventListener("touchend", onSelectionEnd);
       bindLongPress(content);
     }
-    document.addEventListener("mousedown", function (e) {
-      var t = $("aiSelectToolbar");
-      if (t && !t.classList.contains("hidden") && !t.contains(e.target)) hideToolbar();
-    });
+    bindHideToolbar();
     makeDraggable($("aiInterpretFloat"), $("aiInterpretHeader"));
   });
 

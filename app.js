@@ -68,6 +68,15 @@
         "<h3>" + esc(b.title) + "</h3><p>" + esc(b.author || "") + "</p>" +
         "<p>共 " + (b.chapterCount || (b.chapters ? b.chapters.length : 0)) + " 章 · " + (b.commentCount || 0) + " 条段评 · " + (b.bookmarkCount || 0) + " 个书签</p>" +
         (prog ? "<p>读到第 " + (prog.chapterIndex + 1) + " 章 · 已读 " + pct + "%</p><div class='progressbar'><i style='width:" + pct + "%'></i></div>" : "");
+      var del = document.createElement("button");
+      del.className = "book-del"; del.textContent = "✕"; del.setAttribute("aria-label", "删除《" + b.title + "》");
+      del.onclick = async function (ev) {
+        ev.stopPropagation();
+        if (!window.confirm("确定删除《" + b.title + "》吗？它的段评、书签、进度、划线和 AI总结也会一起删掉。")) return;
+        await api.deleteBook(b._id);
+        await loadShelf();
+      };
+      card.appendChild(del);
       card.onclick = function () { openBook(b._id); };
       shelf.appendChild(card);
     });
