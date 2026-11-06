@@ -31,6 +31,28 @@
       apiKey: (s.apiKey || "").trim()
     }));
   }
+  function exportSettings() {
+    var s = getSettings();
+    var blob = new Blob([JSON.stringify(s, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ebook-ai-settings.json";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    if ($("aiSettingsStatus")) $("aiSettingsStatus").textContent = "已导出文件，请自己保管好（文件里有你的密钥，别发给别人、别传到 GitHub）";
+  }
+  async function importSettingsFile(file) {
+    if (!file) return;
+    try {
+      var s = JSON.parse(await file.text());
+      if (!s || typeof s !== "object") throw new Error("文件格式不对");
+      saveSettings({ endpoint: s.endpoint || DEFAULTS.endpoint, model: s.model || DEFAULTS.model, apiKey: s.apiKey || "" });
+      fillSettingsForm();
+      if ($("aiSettingsStatus")) $("aiSettingsStatus").textContent = "已导入 AI 设置" + (getSettings().apiKey ? "（密钥已填好）" : "（文件里没有密钥，请再填一次密钥）");
+    } catch (e) {
+      if ($("aiSettingsStatus")) $("aiSettingsStatus").textContent = "导入失败：" + (e.message || e);
+    }
+  }
   function fillSettingsForm() {
     var s = getSettings();
     if ($("aiEndpointInput")) $("aiEndpointInput").value = s.endpoint;
@@ -251,6 +273,13 @@
       saveSettings({ endpoint: DEFAULTS.endpoint, model: DEFAULTS.model, apiKey: "" });
       fillSettingsForm();
     };
+    var exportBtn = $("aiExportBtn");
+    if (exportBtn) exportBtn.onclick = exportSettings;
+    var importInput = $("aiImportInput");
+    if (importInput) importInput.addEventListener("change", function (e) {
+      importSettingsFile(e.target.files && e.target.files[0]);
+      e.target.value = "";
+    });
     var toolbarBtn = $("aiInterpretToolbarBtn");
     if (toolbarBtn) toolbarBtn.onclick = function () { hideToolbar(); openInterpret(lastSelection); };
     var askBtn = $("aiAskBtn");

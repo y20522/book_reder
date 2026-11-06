@@ -71,6 +71,8 @@
   <p>模型<br><input type="text" id="aiModelInput" placeholder="deepseek-chat"></p>
   <p>密钥<br><input type="password" id="aiKeyInput" placeholder="sk-…（只存在你自己的浏览器里）" autocomplete="off"></p>
   <p><button class="btn primary" id="aiSaveSettingsBtn">保存 AI 设置</button> <button class="btn" id="aiClearKeyBtn">清除密钥</button></p>
+  <p><button class="btn" id="aiExportBtn">导出 AI 设置</button> <label class="btn">导入 AI 设置<input id="aiImportInput" type="file" accept=".json,application/json" class="hidden"></label></p>
+  <p style="color:var(--dim);font-size:13px">换设备不用重新打密钥：在旧设备上点「导出 AI 设置」会下一个文件，新设备上点「导入 AI 设置」选这个文件就行。文件里有你的密钥，自己保管好，别发给别人、别传到 GitHub。</p>
   <p id="aiSettingsStatus" style="color:var(--dim);font-size:13px"></p>
 </div></div>
 
