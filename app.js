@@ -46,6 +46,77 @@
   }
   $("searchInput").addEventListener("input", loadShelf);
 
+  // ---------- 书架导出 / 导入（换设备不用重新传 EPUB） ----------
+  // 只支持本地模式：书、段评、书签、进度、点赞都存在本机 localStorage 里，
+  // 导出成一个 JSON 文件，自己发到手机上再导入就行。云端模式请走云端同步。
+  function lsRead(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || "null") || fallback; } catch (e) { return fallback; } }
+  function lsWrite(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+  function exportShelf() {
+    if (api.mode !== "local") { alert("云端模式下请用云端同步，导出导入只支持本地模式"); return; }
+    var data = {
+      version: 1, exportedAt: Date.now(),
+      books: lsRead("ebook_local_books", []),
+      comments: lsRead("ebook_local_comments", []),
+      bookmarks: lsRead("ebook_local_bookmarks", []),
+      progress: lsRead("ebook_local_progress", []),
+      likes: lsRead("ebook_local_likes", [])
+    };
+    if (!data.books.length) { alert("书架还是空的，先上传一本书再导出"); return; }
+    var blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "ebook-shelf-export.json";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    alert("已导出 " + data.books.length + " 本书，文件里有书、段评、书签和进度；发到手机上再点「导入书架」就行。插图在本地模式下本来就是占位，导入后还是占位。");
+  }
+  async function importShelfFile(file) {
+    if (!file) return;
+    if (api.mode !== "local") { alert("云端模式下请用云端同步，导出导入只支持本地模式"); return; }
+    try {
+      var data = JSON.parse(await file.text());
+      if (data && data.title && data.chapters) data = { books: [data] };
+      if (!data || !Array.isArray(data.books)) throw new Error("文件里没有书，选一下从本站导出的 ebook-shelf-export.json");
+      var books = lsRead("ebook_local_books", []);
+      var added = 0, updated = 0;
+      data.books.forEach(function (b) {
+        if (!b || !b._id || !b.chapters) return;
+        var i = books.findIndex(function (x) { return x._id === b._id; });
+        if (i >= 0) { books[i] = b; updated++; } else { books.push(b); added++; }
+      });
+      lsWrite("ebook_local_books", books);
+      ["comments", "bookmarks"].forEach(function (kind) {
+        var key = "ebook_local_" + kind;
+        var cur = lsRead(key, []);
+        var ids = {}; cur.forEach(function (x) { if (x && x._id) ids[x._id] = true; });
+        (data[kind] || []).forEach(function (x) { if (x && x._id && !ids[x._id]) { cur.push(x); ids[x._id] = true; } });
+        lsWrite(key, cur);
+      });
+      // likes 存的是段评 ID 字符串数组，不是对象，要单独按字符串去重合并。
+      var likes = lsRead("ebook_local_likes", []);
+      (data.likes || []).forEach(function (id) { if (typeof id === "string" && likes.indexOf(id) < 0) likes.push(id); });
+      lsWrite("ebook_local_likes", likes);
+      var prog = lsRead("ebook_local_progress", []);
+      (data.progress || []).forEach(function (p) {
+        if (!p || !p.bookId) return;
+        var i = prog.findIndex(function (x) { return x.bookId === p.bookId; });
+        if (i >= 0) { if (!prog[i].updatedAt || (p.updatedAt || 0) >= prog[i].updatedAt) prog[i] = p; }
+        else prog.push(p);
+      });
+      lsWrite("ebook_local_progress", prog);
+      await loadShelf();
+      alert("导入完成：新增 " + added + " 本，更新 " + updated + " 本。现在书架上有 " + books.length + " 本书。");
+    } catch (err) {
+      alert("导入失败：" + (err && err.message ? err.message : err));
+    }
+  }
+  var exportBtn = $("exportShelfBtn");
+  if (exportBtn) exportBtn.onclick = exportShelf;
+  var importInput = $("importShelfInput");
+  if (importInput) importInput.addEventListener("change", function (e) {
+    importShelfFile(e.target.files && e.target.files[0]);
+    e.target.value = "";
+  });
+
   // ---------- reader ----------
   async function openBook(bookId) {
     var book = await api.getBook(bookId);
