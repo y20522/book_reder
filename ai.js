@@ -113,14 +113,34 @@
     }
     return html + "</li>";
   }
-  function renderSummary(data, raw) {
+  // ---------- AI总结缓存：生成过一次，下次直接看，不再重新生成 ----------
+  var SUMMARY_LS = "ebook_ai_summaries_v1";
+  function summaryKey() {
+    var ch = chapterText();
+    return ch.bookTitle + " | " + ch.chapterTitle;
+  }
+  function loadSummaries() {
+    try { return JSON.parse(localStorage.getItem(SUMMARY_LS) || "{}"); } catch (e) { return {}; }
+  }
+  function saveSummary(key, data, raw) {
+    var all = loadSummaries();
+    all[key] = { data: data, raw: raw || "", savedAt: Date.now() };
+    try { localStorage.setItem(SUMMARY_LS, JSON.stringify(all)); } catch (e) { /* 存储满了就不缓存 */ }
+  }
+  function fmtTime(ts) {
+    var d = new Date(ts);
+    return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+
+  function renderSummary(data, raw, savedAt) {
     var box = $("aiSummaryBody");
     if (!box) return;
+    var cachedNote = savedAt ? "<p class='ai-cached-note'>上次生成于 " + esc(fmtTime(savedAt)) + "，直接呈现之前的结果；想重新生成点右上角「重新生成」。</p>" : "";
     if (!data) {
-      box.innerHTML = "<p>AI 返回的不是标准格式，下面是原文：</p><pre class='ai-raw'>" + esc(raw) + "</pre>";
+      box.innerHTML = cachedNote + "<p>AI 返回的不是标准格式，下面是原文：</p><pre class='ai-raw'>" + esc(raw) + "</pre>";
       return;
     }
-    var html = "";
+    var html = cachedNote;
     if (data.summary) html += "<h4>故事概要</h4><p>" + esc(data.summary) + "</p>";
     if (data.keyPoints && data.keyPoints.length) {
       html += "<h4>关键情节</h4><ol>";
@@ -150,12 +170,18 @@
     else box.innerHTML = html;
   }
 
-  async function summarizeChapter() {
+  // force=true 时重新生成（「重新生成」按钮）；否则有缓存就直接呈现，不再调用 AI。
+  async function summarizeChapter(force) {
     var box = $("aiSummaryBody");
     var btn = $("aiSummaryBtn");
     if (!box) return;
     var ch = chapterText();
-    if (!ch.text) { box.innerHTML = "<p>这一章还没有正文可以总结。</p>"; return; }
+    if (!ch.text) { box.innerHTML = "<p>这一章还没有正文可以总结。</p>"; openSummary(); return; }
+    var key = summaryKey();
+    if (!force) {
+      var cached = loadSummaries()[key];
+      if (cached) { openSummary(); renderSummary(cached.data, cached.raw, cached.savedAt); return; }
+    }
     if (btn) btn.disabled = true;
     box.innerHTML = "<p>正在让 AI 读这一章…（第一次可能要等几秒）</p>";
     openSummary();
@@ -165,7 +191,9 @@
         { role: "system", content: "你是一个中文小说阅读助手。请用中文回答，只返回 JSON，不要加任何解释、不要用 Markdown 代码块包裹之外的文字。JSON 字段：summary（故事概要，200-300字）、keyPoints（关键情节，字符串数组，5-8条）、characters（数组，每项 {name, identity, description, relations:[{to, relation}]}，只写本章实际出现的人物，relations 写人物之间的关系，如“师徒”“对手”“同伴”）、mindmap（本章结构思维导图，{title, children:[{title, children:[...]}]}，3-4层，节点标题要短）。" },
         { role: "user", content: "书名：《" + ch.bookTitle + "》\n章节：" + ch.chapterTitle + "\n正文：\n" + text }
       ]);
-      renderSummary(parseJson(content), content);
+      var data = parseJson(content);
+      saveSummary(key, data, content);
+      renderSummary(data, content, Date.now());
     } catch (e) {
       box.innerHTML = "<p>AI总结失败：" + esc(e.message || e) + "</p><p>请检查设置里的接口地址、模型名和密钥是否正确（密钥只保存在你自己的浏览器里）。</p>";
     }
@@ -174,17 +202,40 @@
   function openSummary() { var m = $("aiSummaryModal"); if (m) m.classList.add("open"); }
   function closeSummary() { var m = $("aiSummaryModal"); if (m) m.classList.remove("open"); }
 
-  // ---------- 划词 AI解读 ----------
+  // ---------- 划词 AI解读 / 翻译 ----------
   var lastSelection = "";
-  function openInterpret(selectedText) {
+  var lastSelectionPara = -1;
+  var interpretMode = "interpret"; // interpret | translate
+  function selectionParaIndex() {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return -1;
+    var node = sel.anchorNode;
+    while (node && node.nodeType !== 1) node = node.parentNode;
+    while (node) {
+      if (node.classList && node.classList.contains("para")) {
+        var v = parseInt(node.getAttribute("data-para"), 10);
+        return isNaN(v) ? -1 : v;
+      }
+      node = node.parentNode;
+    }
+    return -1;
+  }
+  function openInterpret(selectedText, opts) {
     if (selectedText) lastSelection = selectedText;
+    opts = opts || {};
+    interpretMode = opts.mode || "interpret";
     var sel = $("aiSelectedText");
     if (sel) sel.value = lastSelection;
     if ($("aiQuestionInput")) $("aiQuestionInput").value = "";
     if ($("aiAnswerBox")) $("aiAnswerBox").innerHTML = "";
+    var title = $("aiFloatTitle");
+    if (title) title.textContent = interpretMode === "translate" ? "AI翻译" : "AI助手";
+    var q = $("aiQuestionInput");
+    if (q) q.placeholder = interpretMode === "translate" ? "想让它怎么翻？（不填就默认中英互译）" : "你的问题（不填就默认：请解读这段文字）";
     var w = $("aiInterpretFloat");
     if (w) { w.classList.remove("hidden"); }
-    if (sel) sel.focus();
+    if (opts.auto) askInterpret();
+    else if (sel) sel.focus();
   }
   function closeInterpret() {
     var w = $("aiInterpretFloat");
@@ -196,9 +247,23 @@
     var q = $("aiQuestionInput") ? $("aiQuestionInput").value.trim() : "";
     var box = $("aiAnswerBox");
     if (!selText) { if (box) box.innerHTML = "<p>请先在输入框里粘贴或写一段要解读的文本。</p>"; return; }
+    var ch = chapterText();
+    if (interpretMode === "translate") {
+      if (!q) q = "请翻译这段文字";
+      if (box) box.innerHTML = "<p>正在翻译…</p>";
+      try {
+        var tr = await chat([
+          { role: "system", content: "你是一个翻译助手。原文是中文就翻译成英文，原文是英文就翻译成中文。只返回译文本身，不要加解释、不要加引号、不要编造原文没有的内容。" },
+          { role: "user", content: q + "：\n" + selText }
+        ]);
+        if (box) box.innerHTML = "<p class='ai-translation'>" + esc(tr).replace(/\n/g, "<br>") + "</p>";
+      } catch (e) {
+        if (box) box.innerHTML = "<p>翻译失败：" + esc(e.message || e) + "</p><p>请检查设置里的接口地址、模型名和密钥是否正确。</p>";
+      }
+      return;
+    }
     if (!q) q = "请解读这段文字：讲了什么、有什么含义、和上下文有什么关系？";
     if (box) box.innerHTML = "<p>AI 正在解读…</p>";
-    var ch = chapterText();
     try {
       var content = await chat([
         { role: "system", content: "你是一个中文小说阅读助手。请用中文、通俗易懂地回答，先直接回答问题，再补充必要的背景和细节。不要编造原文里没有的情节。" },
@@ -210,8 +275,49 @@
     }
   }
 
-  // ---------- 划词浮动工具条 ----------
-  function hideToolbar() { var t = $("aiSelectToolbar"); if (t) t.classList.add("hidden"); }
+  // ---------- 划线（高亮 / 下划线 / 波浪线 / 灰底），存在本机 ----------
+  var HL_LS = "ebook_highlights_v1";
+  function loadHighlights() {
+    try { return JSON.parse(localStorage.getItem(HL_LS) || "[]"); } catch (e) { return []; }
+  }
+  function saveHighlights(list) {
+    try { localStorage.setItem(HL_LS, JSON.stringify(list)); } catch (e) {}
+  }
+  function highlightKey() {
+    var ch = chapterText();
+    return { book: ch.bookTitle, chapter: ch.chapterTitle };
+  }
+  function addHighlight(style) {
+    if (!lastSelection) return;
+    var key = highlightKey();
+    var list = loadHighlights();
+    if (style === "remove") {
+      list = list.filter(function (h) { return !(h.book === key.book && h.chapter === key.chapter && h.para === lastSelectionPara && h.text === lastSelection); });
+    } else {
+      var exists = list.some(function (h) { return h.book === key.book && h.chapter === key.chapter && h.para === lastSelectionPara && h.text === lastSelection; });
+      if (!exists) list.push({ book: key.book, chapter: key.chapter, para: lastSelectionPara, text: lastSelection, style: style, createdAt: Date.now() });
+    }
+    saveHighlights(list);
+    hideToolbar(); hideHighlightPalette();
+    try { window.getSelection().removeAllRanges(); } catch (e) {}
+    // 让阅读器重新渲染这一章，把划线画上去（保持原来的滚动位置）。
+    window.dispatchEvent(new CustomEvent("ebook:highlights-changed"));
+  }
+  function hideHighlightPalette() { var p = $("aiHighlightPalette"); if (p) p.classList.add("hidden"); }
+
+  // ---------- 划词浮动工具条（文石 BOOX 式：AI解读 / 翻译 / 划线 / 复制） ----------
+  function hideToolbar() { var t = $("aiSelectToolbar"); if (t) t.classList.add("hidden"); hideHighlightPalette(); }
+  function showToolbarAt(rect) {
+    var t = $("aiSelectToolbar");
+    if (!t) return;
+    t.classList.remove("hidden");
+    var w = t.offsetWidth || 320;
+    var left = Math.max(8, Math.min(window.innerWidth - w - 8, rect.left + rect.width / 2 - w / 2));
+    var top = rect.top - 52;
+    if (top < 8) top = Math.min(window.innerHeight - 60, rect.bottom + 8);
+    t.style.left = left + "px";
+    t.style.top = top + "px";
+  }
   function onSelectionEnd() {
     setTimeout(function () {
       var sel = window.getSelection();
@@ -220,15 +326,38 @@
       var container = $("chapterContent");
       if (!text || text.length < 2 || text.length > 2000 || !container || !container.contains(sel.anchorNode)) { hideToolbar(); return; }
       lastSelection = text;
-      var rect = sel.getRangeAt(0).getBoundingClientRect();
-      var t = $("aiSelectToolbar");
-      if (!t) return;
-      t.classList.remove("hidden");
-      var left = Math.max(8, Math.min(window.innerWidth - 120, rect.left + rect.width / 2 - 50));
-      var top = Math.max(8, rect.top - 44);
-      t.style.left = left + "px";
-      t.style.top = top + "px";
+      lastSelectionPara = selectionParaIndex();
+      showToolbarAt(sel.getRangeAt(0).getBoundingClientRect());
     }, 30);
+  }
+  // 长按（手机 / 墨水屏）：按住一个段落 600ms 不动，就选中整段并弹出工具条，
+  // 和 BOOX 长按选词后出工具条一样。滑动会取消，不影响正常翻页。
+  function bindLongPress(content) {
+    if (!content) return;
+    var timer = null, sx = 0, sy = 0;
+    content.addEventListener("touchstart", function (e) {
+      if (e.touches.length !== 1) return;
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      var target = e.target;
+      var para = target && target.closest ? target.closest(".para") : null;
+      if (!para) return;
+      timer = setTimeout(function () {
+        var sel = window.getSelection();
+        if (sel && sel.toString().trim().length > 1) return; // 已经选了词，等 touchend 出工具条
+        var range = document.createRange();
+        range.selectNodeContents(para);
+        sel.removeAllRanges(); sel.addRange(range);
+        lastSelection = para.textContent.replace(/\s*\d+\s*$/, "").trim();
+        lastSelectionPara = parseInt(para.getAttribute("data-para"), 10) || -1;
+        showToolbarAt(para.getBoundingClientRect());
+      }, 600);
+    }, { passive: true });
+    content.addEventListener("touchmove", function (e) {
+      if (!timer) return;
+      var t = e.touches[0];
+      if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) { clearTimeout(timer); timer = null; }
+    }, { passive: true });
+    content.addEventListener("touchend", function () { if (timer) { clearTimeout(timer); timer = null; } }, { passive: true });
   }
 
   // ---------- 悬浮窗拖动 ----------
@@ -253,11 +382,11 @@
   document.addEventListener("DOMContentLoaded", function () {
     fillSettingsForm();
     var sBtn = $("aiSummaryBtn");
-    if (sBtn) sBtn.onclick = summarizeChapter;
+    if (sBtn) sBtn.onclick = function () { summarizeChapter(false); };
     var sClose = $("closeAiSummaryBtn");
     if (sClose) sClose.onclick = closeSummary;
     var sRegen = $("aiSummaryRegenBtn");
-    if (sRegen) sRegen.onclick = summarizeChapter;
+    if (sRegen) sRegen.onclick = function () { summarizeChapter(true); };
     var saveBtn = $("aiSaveSettingsBtn");
     if (saveBtn) saveBtn.onclick = function () {
       saveSettings({
@@ -281,15 +410,42 @@
       e.target.value = "";
     });
     var toolbarBtn = $("aiInterpretToolbarBtn");
-    if (toolbarBtn) toolbarBtn.onclick = function () { hideToolbar(); openInterpret(lastSelection); };
+    if (toolbarBtn) toolbarBtn.onclick = function () { hideToolbar(); openInterpret(lastSelection, { mode: "interpret" }); };
+    var translateBtn = $("aiTranslateToolbarBtn");
+    if (translateBtn) translateBtn.onclick = function () { hideToolbar(); openInterpret(lastSelection, { mode: "translate", auto: true }); };
+    var hlBtn = $("aiHighlightToolbarBtn");
+    if (hlBtn) hlBtn.onclick = function () {
+      var p = $("aiHighlightPalette");
+      if (!p) return;
+      var t = $("aiSelectToolbar");
+      var r = t ? t.getBoundingClientRect() : { left: 8, bottom: 100 };
+      p.classList.remove("hidden");
+      p.style.left = Math.max(8, r.left) + "px";
+      p.style.top = (r.bottom + 8) + "px";
+    };
+    document.querySelectorAll("#aiHighlightPalette [data-hl]").forEach(function (b) {
+      b.onclick = function () { addHighlight(b.getAttribute("data-hl")); };
+    });
+    var copyBtn = $("aiCopyToolbarBtn");
+    if (copyBtn) copyBtn.onclick = function () {
+      if (!lastSelection) return;
+      var done = function () { hideToolbar(); try { window.getSelection().removeAllRanges(); } catch (e) {} };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lastSelection).then(done, done);
+      else { var ta = document.createElement("textarea"); ta.value = lastSelection; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e) {} ta.remove(); done(); }
+    };
     var askBtn = $("aiAskBtn");
     if (askBtn) askBtn.onclick = askInterpret;
+    var qInput = $("aiQuestionInput");
+    if (qInput) qInput.addEventListener("keydown", function (e) { if (e.key === "Enter") askInterpret(); });
     var closeBtn = $("closeAiInterpretBtn");
     if (closeBtn) closeBtn.onclick = closeInterpret;
+    var expandBtn = $("aiExpandBtn");
+    if (expandBtn) expandBtn.onclick = function () { var w = $("aiInterpretFloat"); if (w) w.classList.toggle("ai-full"); };
     var content = $("chapterContent");
     if (content) {
       content.addEventListener("mouseup", onSelectionEnd);
       content.addEventListener("touchend", onSelectionEnd);
+      bindLongPress(content);
     }
     document.addEventListener("mousedown", function (e) {
       var t = $("aiSelectToolbar");

@@ -225,7 +225,23 @@
       var p = document.createElement("p"); p.className = "para"; p.setAttribute("data-para", idx);
       var cnt2 = state.commentCounts[idx] || 0;
       if (cnt2) p.classList.add("has-comments");
-      p.textContent = block.text;
+      // 划线：把本章存过的划线按原文原样包一层 span 画出来。
+      var hlList = [];
+      try { hlList = JSON.parse(localStorage.getItem("ebook_highlights_v1") || "[]"); } catch (e) { hlList = []; }
+      var myHls = hlList.filter(function (h) { return h.book === state.book.title && h.chapter === state.chapter.title && h.para === idx && block.text.indexOf(h.text) >= 0; });
+      if (myHls.length) {
+        var rest = block.text;
+        myHls.forEach(function (h) {
+          var at = rest.indexOf(h.text);
+          if (at < 0) return;
+          if (at > 0) p.appendChild(document.createTextNode(rest.slice(0, at)));
+          var sp = document.createElement("span"); sp.className = "hl-" + h.style; sp.textContent = h.text; p.appendChild(sp);
+          rest = rest.slice(at + h.text.length);
+        });
+        if (rest) p.appendChild(document.createTextNode(rest));
+      } else {
+        p.textContent = block.text;
+      }
       if (cnt2) { var bb = document.createElement("span"); bb.className = "bubble"; bb.textContent = cnt2; p.appendChild(bb); }
       p.onclick = function () { if (window.getSelection && window.getSelection().toString().trim().length > 1) return; openComments(idx); };
       container.appendChild(p);
@@ -238,6 +254,11 @@
     saveProgressNow();
   }
   function gotoChapter(ci) { state.chapterIndex = ci; window.scrollTo(0, 0); renderChapter(); }
+  // 划线改了之后重新渲染本章，把线画上去，滚动位置不动。
+  window.addEventListener("ebook:highlights-changed", function () {
+    var y = window.scrollY || 0;
+    renderChapter().then(function () { window.scrollTo(0, y); });
+  });
 
   // Automatic real-time progress: scroll (throttled) + pagehide/visibilitychange.
   function currentParaIndex() {

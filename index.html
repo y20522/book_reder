@@ -90,16 +90,37 @@
   <div id="aiSummaryBody"><p>点「AI总结」后，这里会显示本章的故事概要、关键情节、思维导图和人物关系。</p></div>
 </div></div>
 
-<div id="aiSelectToolbar" class="ai-toolbar hidden"><button class="btn primary" id="aiInterpretToolbarBtn">AI解读</button></div>
+<div id="aiSelectToolbar" class="ai-toolbar hidden">
+  <button class="btn" id="aiInterpretToolbarBtn">💡 AI解读</button>
+  <button class="btn" id="aiTranslateToolbarBtn">🌐 翻译</button>
+  <button class="btn" id="aiHighlightToolbarBtn">🖍 划线</button>
+  <button class="btn" id="aiCopyToolbarBtn">📋 复制</button>
+</div>
+<div id="aiHighlightPalette" class="ai-toolbar hidden">
+  <button class="btn" data-hl="yellow">🟨 高亮</button>
+  <button class="btn" data-hl="underline">下划线</button>
+  <button class="btn" data-hl="wavy">波浪线</button>
+  <button class="btn" data-hl="grey">⬛ 灰底</button>
+  <button class="btn" data-hl="remove">🗑 清除</button>
+</div>
 
 <div id="aiInterpretFloat" class="ai-float hidden">
-  <div class="ai-float-header" id="aiInterpretHeader"><strong>AI解读</strong><span style="flex:1"></span><button class="btn" id="closeAiInterpretBtn">关闭</button></div>
+  <div class="ai-float-header" id="aiInterpretHeader"><button class="btn" id="aiExpandBtn" aria-label="全屏">⤢</button><strong id="aiFloatTitle">AI助手</strong><span style="flex:1"></span><button class="btn" id="closeAiInterpretBtn">✕</button></div>
   <div class="ai-float-body">
-    <p style="color:var(--dim);font-size:13px">下面是你在文章里选中的文本，可以直接在里面继续改；再在问题框里写你的问题，点「问 AI」。</p>
-    <textarea id="aiSelectedText" rows="4" placeholder="选中的文本会出现在这里"></textarea>
-    <input type="text" id="aiQuestionInput" placeholder="你的问题（不填就默认：请解读这段文字）" style="margin-top:8px">
-    <button class="btn primary" id="aiAskBtn" style="margin-top:8px">问 AI</button>
-    <div id="aiAnswerBox" style="margin-top:10px"></div>
+    <div class="ai-greeting">
+      <div class="ai-logo">Ai</div>
+      <h3>Hello 我是你的AI小助手</h3>
+      <p>选中一段文字，我可以帮你解读、翻译；也可以直接在下面问我问题。</p>
+    </div>
+    <div id="aiAnswerBox"></div>
+    <div class="ai-context">
+      <label>选中的文本</label>
+      <textarea id="aiSelectedText" rows="3" placeholder="选中的文本会出现在这里"></textarea>
+    </div>
+    <div class="ai-input-row">
+      <input type="text" id="aiQuestionInput" placeholder="你的问题（不填就默认：请解读这段文字）">
+      <button class="btn primary ai-send" id="aiAskBtn" aria-label="发送">➤</button>
+    </div>
   </div>
 </div>
 
