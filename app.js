@@ -6,6 +6,18 @@
   var state = { books: [], book: null, chapterIndex: 0, chapter: null, commentCounts: {}, commentTarget: null, commentSort: "hot", settings: JSON.parse(localStorage.getItem("ebook_settings") || '{"fontSize":17,"lineHeight":1.9,"theme":"paper"}') };
   var saveTimer = null;
 
+  window.EbookReaderContext = function () {
+    if (!state.book || !state.chapter) return null;
+    var chapters = state.book.chapters || [];
+    return {
+      bookTitle: state.book.title || "",
+      author: state.book.author || "",
+      chapterNumber: state.chapterIndex + 1,
+      chapterCount: chapters.length || state.book.chapterCount || 0,
+      chapterTitle: state.chapter.title || ""
+    };
+  };
+
   function applySettings() {
     document.body.setAttribute("data-theme", state.settings.theme);
     document.documentElement.style.fontSize = state.settings.fontSize + "px";
