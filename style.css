@@ -2,9 +2,12 @@
 body[data-theme="white"]{--bg:#fff;--text:#222;--card:#fff;--line:#ddd}
 body[data-theme="night"]{--bg:#1c1c1e;--text:#e8e8e8;--dim:#999;--line:#333;--card:#2a2a2e;--accent:#ff6b6b;--surface:#2a2a2e}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
 a{color:inherit}
-button{cursor:pointer}
+button{cursor:pointer;touch-action:manipulation}
+input,textarea{font-size:16px}
+img{max-width:100%;height:auto}
 .topbar{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .topbar h1{font-size:20px;margin:0}
 .topbar input{flex:1;min-width:160px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)}
@@ -27,9 +30,15 @@ button{cursor:pointer}
 .para img,.imgblock img{max-width:100%;display:block;margin:8px auto;border-radius:8px}
 .imgblock{text-align:center;cursor:pointer}
 .flag{color:var(--accent);font-size:13px;margin-left:6px}
-.bottombar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 6px}
-.bottombar button{border:0;background:transparent;color:var(--text);font-size:14px;padding:8px}
+.bottombar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 6px calc(6px + env(safe-area-inset-right));padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.bottombar button{border:0;background:transparent;color:var(--text);font-size:14px;padding:8px;min-height:44px;min-width:44px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.bb-icon{font-size:18px;line-height:1}
+.bb-label{font-size:12px}
 .bottombar b{color:var(--accent)}
+.chrome-toggle{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:25;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:20px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+#readerView.chrome-hidden .reader-top{transform:translateY(-110%);opacity:0;pointer-events:none}
+#readerView.chrome-hidden .bottombar{transform:translateY(110%);opacity:0;pointer-events:none}
+.reader-top,.bottombar{transition:transform .25s ease,opacity .25s ease}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:30}
 .modal.open{display:flex}
 .sheet{background:var(--card);color:var(--text);width:100%;max-width:760px;max-height:78vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
@@ -55,4 +64,48 @@ button{cursor:pointer}
 .relations{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
 .rel-chip{display:inline-block;border:1px solid var(--line);border-radius:12px;padding:2px 8px;font-size:13px;color:var(--dim)}
 .ai-raw{white-space:pre-wrap;word-break:break-word;font-size:14px}
-@media(max-width:600px){.shelf{grid-template-columns:1fr 1fr}}
+/* ---------- 手机端（番茄小说式） ---------- */
+@media(max-width:768px){
+  /* 书架：番茄式三列封面墙，标题两行截断 */
+  .topbar{padding:10px 12px;gap:8px;position:sticky;top:0}
+  .topbar h1{font-size:18px}
+  .topbar input{order:3;flex-basis:100%;min-width:0;padding:10px}
+  .topbar .btn{padding:10px 12px;min-height:44px}
+  .shelf{grid-template-columns:repeat(3,1fr);gap:12px 10px;padding:12px}
+  .bookcard{padding:8px;border-radius:10px}
+  .bookcard img{border-radius:6px}
+  .bookcard h3{font-size:13px;line-height:1.35;margin:8px 0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:35px}
+  .bookcard p{font-size:11px;line-height:1.4}
+  .bookcard p:nth-of-type(2){display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  /* 阅读器：两侧留白 20px，正文更舒服，标题居中 */
+  .reader{padding:0 20px 140px}
+  .reader h2{font-size:21px;text-align:center;margin:18px 0 8px;line-height:1.4}
+  .reader h3{font-size:18px;margin:1.2em 0 .6em}
+  .para{font-size:18px;line-height:1.9;margin:1.1em 0;word-break:break-word;overflow-wrap:break-word}
+  .reader-top{padding:8px 0}
+  .reader-top .row{flex-wrap:nowrap;gap:6px}
+  .reader-top .btn{padding:8px 10px;min-height:40px;flex-shrink:0}
+  #bookTitle{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  #progressText{flex-shrink:0}
+  #aiSummaryBtn{flex-shrink:0}
+  /* 章节翻页按钮：全宽大按钮，好点 */
+  .reader .row .btn{flex:1;min-height:48px;font-size:16px}
+  /* 底部栏：番茄式图标+文字，五等分 */
+  .bottombar button{flex:1;min-height:52px}
+  /* 弹窗：底部抽屉，占满宽度，圆角更大，留安全区 */
+  .sheet{max-height:85vh;border-radius:20px 20px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
+  .sheet .btn{min-height:44px}
+  .listitem{padding:12px}
+  /* AI 悬浮窗：手机上变成底部抽屉，全宽 */
+  .ai-float{left:0;right:0;top:auto;bottom:0;transform:none;width:100vw;max-height:85vh;border-radius:20px 20px 0 0}
+  .ai-float-header{cursor:default}
+  .ai-float textarea{font-size:16px}
+  .ai-toolbar{box-shadow:0 4px 16px rgba(0,0,0,.25)}
+  .ai-toolbar .btn{min-height:44px;padding:10px 16px}
+}
+@media(max-width:400px){
+  .shelf{grid-template-columns:repeat(3,1fr);gap:10px 8px;padding:10px}
+  .bookcard h3{font-size:12px}
+  .para{font-size:17px}
+  .bb-label{font-size:11px}
+}

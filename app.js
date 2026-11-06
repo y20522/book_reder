@@ -56,6 +56,7 @@
     state.chapterIndex = prog ? prog.chapterIndex : 0;
     $("shelfView").classList.add("hidden");
     $("readerView").classList.remove("hidden");
+    setChromeHidden(false);
     $("bookTitle").textContent = book.title;
     await renderChapter();
     if (prog && prog.paragraphIndex) {
@@ -67,6 +68,25 @@
     refreshBookmarks();
   }
   $("backBtn").onclick = function () { $("readerView").classList.add("hidden"); $("shelfView").classList.remove("hidden"); loadShelf(); };
+
+  // 手机沉浸阅读（番茄式）：点章节标题、或向下滚时收起上下栏，向上滚 / 点右下角 ☰ 再显示。
+  // 段落点开段评的逻辑不变，标题点按只负责显隐菜单。
+  var lastScrollY = 0;
+  function setChromeHidden(hidden) {
+    var rv = $("readerView"); if (!rv) return;
+    rv.classList.toggle("chrome-hidden", hidden);
+    var t = $("chromeToggleBtn"); if (t) t.classList.toggle("hidden", !hidden);
+  }
+  var chromeBtn = $("chromeToggleBtn");
+  if (chromeBtn) chromeBtn.onclick = function () { setChromeHidden(false); };
+  window.addEventListener("scroll", function () {
+    if ($("readerView").classList.contains("hidden")) return;
+    if (window.innerWidth > 768) return;
+    var y = window.scrollY || 0;
+    if (y > lastScrollY + 30 && y > 140) setChromeHidden(true);
+    else if (y < lastScrollY - 30) setChromeHidden(false);
+    lastScrollY = y;
+  }, { passive: true });
 
   async function renderChapter() {
     var data = await api.getChapter(state.book._id, state.chapterIndex);
@@ -84,10 +104,12 @@
     }
     var curParas = state.chapter.blocks ? state.chapter.blocks.length : 0;
     var pct = totalParas ? Math.round(((doneParas + Math.min(1, curParas ? 1 : 0)) / totalParas) * 100) : 0;
-    $("progressText").textContent = "第 " + (state.chapterIndex + 1) + " / " + totalCh + " 章";
+    $("progressText").textContent = "第 " + (state.chapterIndex + 1) + " / " + totalCh + " 章 · 已读 " + pct + "%";
     $("progressBar").style.width = pct + "%";
     var container = $("chapterContent"); container.innerHTML = "";
-    var h = document.createElement("h2"); h.textContent = state.chapter.title; container.appendChild(h);
+    var h = document.createElement("h2"); h.textContent = state.chapter.title;
+    h.onclick = function () { var rv = $("readerView"); if (rv) setChromeHidden(!rv.classList.contains("chrome-hidden")); };
+    container.appendChild(h);
     (state.chapter.blocks || []).forEach(function (block, idx) {
       if (block.kind === "image") {
         var div = document.createElement("div"); div.className = "imgblock"; div.setAttribute("data-para", idx);

@@ -2,7 +2,11 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fdfbf7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>电子书站</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -30,13 +34,14 @@
     <div class="thin"><i id="progressBar" style="width:0%"></i></div>
   </div>
   <div id="chapterContent" class="reader"></div>
-  <div class="bottombar">
-    <button id="tocBtn">目录</button>
-    <button id="bookmarkListBtn">书签 <b id="bookmarkCount"></b></button>
-    <button id="addBookmarkBtn">添加书签</button>
-    <button id="commentsBtn">段评</button>
-    <button id="settingsBtn">设置</button>
+  <div class="bottombar" id="bottomBar">
+    <button id="tocBtn"><span class="bb-icon">📖</span><span class="bb-label">目录</span></button>
+    <button id="bookmarkListBtn"><span class="bb-icon">🔖</span><span class="bb-label">书签</span> <b id="bookmarkCount"></b></button>
+    <button id="addBookmarkBtn"><span class="bb-icon">➕</span><span class="bb-label">收藏</span></button>
+    <button id="commentsBtn"><span class="bb-icon">💬</span><span class="bb-label">段评</span></button>
+    <button id="settingsBtn"><span class="bb-icon">⚙️</span><span class="bb-label">设置</span></button>
   </div>
+  <button id="chromeToggleBtn" class="chrome-toggle hidden" aria-label="显示菜单">☰</button>
 </div>
 
 <div id="commentModal" class="modal"><div class="sheet">
