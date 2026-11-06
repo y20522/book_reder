@@ -52,7 +52,12 @@ img{max-width:100%;height:auto}
 .listitem small{color:var(--dim)}
 .hidden{display:none}
 /* 文石 BOOX 式划词工具条：白底圆角 pill，图标+文字 */
+/* 注意：.hidden{display:none} 写在文件前面，.ai-toolbar{display:flex} 写在后面，
+   两者都是单类选择器，后写的会赢——所以光加 hidden 类藏不住工具条，
+   它会一直以 fixed 定位停在页面左下角（就是书架上一直能看到它的原因）。
+   必须用双类选择器把 hidden 的优先级抬上去。 */
 .ai-toolbar{position:fixed;z-index:40;box-shadow:0 4px 16px rgba(0,0,0,.25);border-radius:12px;display:flex;gap:2px;padding:6px;background:var(--card);border:1px solid var(--line);max-width:calc(100vw - 16px);flex-wrap:wrap}
+.ai-toolbar.hidden{display:none}
 .ai-toolbar .btn{border:0;background:transparent;padding:8px 10px;min-height:44px;font-size:14px;white-space:nowrap}
 .ai-toolbar .btn:active{background:var(--line);border-radius:8px}
 #aiHighlightPalette{max-width:calc(100vw - 16px)}
