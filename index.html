@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>电子书站</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="paper">
+<div id="shelfView">
+  <div class="topbar">
+    <h1>电子书站</h1>
+    <input id="searchInput" placeholder="搜索书名 / 作者">
+    <label class="btn primary">上传书籍<input id="fileInput" type="file" accept=".epub,.txt" class="hidden"></label>
+    <span id="modeHint" style="color:var(--dim);font-size:12px"></span>
+  </div>
+  <div id="shelf" class="shelf"></div>
+  <p id="emptyHint" class="hidden" style="text-align:center;color:var(--dim)">书架还是空的，点右上角「上传书籍」传一本 EPUB / TXT 吧。</p>
+</div>
+
+<div id="readerView" class="hidden">
+  <div class="reader-top">
+    <div class="row">
+      <button class="btn" id="backBtn">← 书架</button>
+      <strong id="bookTitle"></strong>
+      <span id="progressText" style="color:var(--dim);font-size:13px"></span>
+    </div>
+    <div class="thin"><i id="progressBar" style="width:0%"></i></div>
+  </div>
+  <div id="chapterContent" class="reader"></div>
+  <div class="bottombar">
+    <button id="tocBtn">目录</button>
+    <button id="bookmarkListBtn">书签 <b id="bookmarkCount"></b></button>
+    <button id="addBookmarkBtn">添加书签</button>
+    <button id="commentsBtn">段评</button>
+    <button id="settingsBtn">设置</button>
+  </div>
+</div>
+
+<div id="commentModal" class="modal"><div class="sheet">
+  <div class="row"><strong>段评</strong><span style="flex:1"></span>
+    <button class="btn" data-sort="hot">热门</button><button class="btn" data-sort="new">最新</button>
+    <button class="btn" id="closeCommentBtn">关闭</button></div>
+  <div id="commentList"></div>
+  <input type="text" id="nicknameInput" placeholder="昵称（可选，默认：读者）" style="margin-top:10px">
+  <textarea id="commentInput" rows="3" placeholder="写下你对这一段的看法…" style="margin-top:8px"></textarea>
+  <button class="btn primary" id="postCommentBtn" style="margin-top:8px">发表</button>
+</div></div>
+
+<div id="tocModal" class="modal"><div class="sheet">
+  <div class="row"><strong>目录</strong><span style="flex:1"></span><button class="btn" id="closeTocBtn">关闭</button></div>
+  <div id="tocList"></div>
+</div></div>
+
+<div id="bookmarkModal" class="modal"><div class="sheet">
+  <div class="row"><strong>我的书签</strong><span style="flex:1"></span><button class="btn" id="closeBookmarkBtn">关闭</button></div>
+  <div id="bookmarkList"></div>
+</div></div>
+
+<div id="settingsModal" class="modal"><div class="sheet">
+  <div class="row"><strong>设置</strong><span style="flex:1"></span><button class="btn" id="closeSettingsBtn">关闭</button></div>
+  <p>字号 <button class="btn" id="fontMinus">A-</button> <span id="fontSizeLabel"></span> <button class="btn" id="fontPlus">A+</button></p>
+  <p>行距 <button class="btn" id="lineMinus">-</button> <span id="lineHeightLabel"></span> <button class="btn" id="linePlus">+</button></p>
+  <p>主题 <button class="btn" data-theme="paper">纸白</button> <button class="btn" data-theme="white">纯白</button> <button class="btn" data-theme="night">夜间</button></p>
+</div></div>
+
+<script src="config.js"></script>
+<script src="epub.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
