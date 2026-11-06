@@ -41,4 +41,18 @@ button{cursor:pointer}
 .listitem{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;cursor:pointer}
 .listitem small{color:var(--dim)}
 .hidden{display:none}
+.ai-toolbar{position:fixed;z-index:40;box-shadow:0 4px 16px rgba(0,0,0,.25);border-radius:8px}
+.ai-float{position:fixed;left:50%;top:16%;transform:translateX(-50%);z-index:50;width:min(680px,92vw);max-height:80vh;overflow:auto;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.ai-float-header{display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);cursor:move;position:sticky;top:0;background:var(--card)}
+.ai-float-body{padding:14px}
+.ai-float textarea,.ai-float input[type="text"]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:15px}
+.ai-float textarea::placeholder,.ai-float input[type="text"]::placeholder{color:var(--dim)}
+.mindmap{overflow-x:auto;padding:8px 0}
+.mm-tree,.mm-tree ul{list-style:none;margin:0;padding-left:22px}
+.mm-tree>li{padding-left:0}
+.mm-node{display:inline-block;border:1px solid var(--line);border-radius:8px;padding:4px 10px;margin:4px 0;background:var(--card)}
+.char-card{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0}
+.relations{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+.rel-chip{display:inline-block;border:1px solid var(--line);border-radius:12px;padding:2px 8px;font-size:13px;color:var(--dim)}
+.ai-raw{white-space:pre-wrap;word-break:break-word;font-size:14px}
 @media(max-width:600px){.shelf{grid-template-columns:1fr 1fr}}

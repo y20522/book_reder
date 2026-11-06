@@ -24,6 +24,8 @@
       <button class="btn" id="backBtn">← 书架</button>
       <strong id="bookTitle"></strong>
       <span id="progressText" style="color:var(--dim);font-size:13px"></span>
+      <span style="flex:1"></span>
+      <button class="btn primary" id="aiSummaryBtn">AI总结</button>
     </div>
     <div class="thin"><i id="progressBar" style="width:0%"></i></div>
   </div>
@@ -62,11 +64,40 @@
   <p>字号 <button class="btn" id="fontMinus">A-</button> <span id="fontSizeLabel"></span> <button class="btn" id="fontPlus">A+</button></p>
   <p>行距 <button class="btn" id="lineMinus">-</button> <span id="lineHeightLabel"></span> <button class="btn" id="linePlus">+</button></p>
   <p>主题 <button class="btn" data-theme="paper">纸白</button> <button class="btn" data-theme="white">纯白</button> <button class="btn" data-theme="night">夜间</button></p>
+  <hr>
+  <h4>AI 设置（用你自己的大模型密钥）</h4>
+  <p style="color:var(--dim);font-size:13px">密钥只保存在你自己的浏览器里，不会写进代码、不会上传到 GitHub。接口要兼容 OpenAI 格式（DeepSeek / OpenAI / 通义等都行）。</p>
+  <p>接口地址<br><input type="text" id="aiEndpointInput" placeholder="https://api.deepseek.com/v1/chat/completions"></p>
+  <p>模型<br><input type="text" id="aiModelInput" placeholder="deepseek-chat"></p>
+  <p>密钥<br><input type="password" id="aiKeyInput" placeholder="sk-…（只存在你自己的浏览器里）" autocomplete="off"></p>
+  <p><button class="btn primary" id="aiSaveSettingsBtn">保存 AI 设置</button> <button class="btn" id="aiClearKeyBtn">清除密钥</button></p>
+  <p id="aiSettingsStatus" style="color:var(--dim);font-size:13px"></p>
 </div></div>
+
+<div id="aiSummaryModal" class="modal"><div class="sheet">
+  <div class="row"><strong>AI总结 · 本章</strong><span style="flex:1"></span>
+    <button class="btn" id="aiSummaryRegenBtn">重新生成</button>
+    <button class="btn" id="closeAiSummaryBtn">关闭</button></div>
+  <div id="aiSummaryBody"><p>点「AI总结」后，这里会显示本章的故事概要、关键情节、思维导图和人物关系。</p></div>
+</div></div>
+
+<div id="aiSelectToolbar" class="ai-toolbar hidden"><button class="btn primary" id="aiInterpretToolbarBtn">AI解读</button></div>
+
+<div id="aiInterpretFloat" class="ai-float hidden">
+  <div class="ai-float-header" id="aiInterpretHeader"><strong>AI解读</strong><span style="flex:1"></span><button class="btn" id="closeAiInterpretBtn">关闭</button></div>
+  <div class="ai-float-body">
+    <p style="color:var(--dim);font-size:13px">下面是你在文章里选中的文本，可以直接在里面继续改；再在问题框里写你的问题，点「问 AI」。</p>
+    <textarea id="aiSelectedText" rows="4" placeholder="选中的文本会出现在这里"></textarea>
+    <input type="text" id="aiQuestionInput" placeholder="你的问题（不填就默认：请解读这段文字）" style="margin-top:8px">
+    <button class="btn primary" id="aiAskBtn" style="margin-top:8px">问 AI</button>
+    <div id="aiAnswerBox" style="margin-top:10px"></div>
+  </div>
+</div>
 
 <script src="config.js"></script>
 <script src="epub.js"></script>
 <script src="api.js"></script>
+<script src="ai.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

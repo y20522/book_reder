@@ -97,7 +97,7 @@
         else { var note = document.createElement("p"); note.style.color = "var(--dim)"; note.textContent = "［插图：" + (block.imagePath || "图片") + "］"; div.appendChild(note); }
         var cnt = state.commentCounts[idx] || 0;
         if (cnt) { var b = document.createElement("span"); b.className = "bubble"; b.textContent = cnt; div.appendChild(b); }
-        div.onclick = function () { openComments(idx); };
+        div.onclick = function () { if (window.getSelection && window.getSelection().toString().trim().length > 1) return; openComments(idx); };
         container.appendChild(div); return;
       }
       if (block.kind === "heading") { var hh = document.createElement("h3"); hh.textContent = block.text; container.appendChild(hh); return; }
@@ -106,7 +106,7 @@
       if (cnt2) p.classList.add("has-comments");
       p.textContent = block.text;
       if (cnt2) { var bb = document.createElement("span"); bb.className = "bubble"; bb.textContent = cnt2; p.appendChild(bb); }
-      p.onclick = function () { openComments(idx); };
+      p.onclick = function () { if (window.getSelection && window.getSelection().toString().trim().length > 1) return; openComments(idx); };
       container.appendChild(p);
     });
     // Prev / next chapter buttons
